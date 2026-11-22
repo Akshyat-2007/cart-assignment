@@ -1,0 +1,598 @@
+TAP version 13
+# Subtest: TC01 [FR1] register with valid details -> account created
+ok 1 - TC01 [FR1] register with valid details -> account created
+  ---
+  duration_ms: 114.905306
+  type: 'test'
+  ...
+# Subtest: TC02 [FR1] duplicate username -> error 409
+ok 2 - TC02 [FR1] duplicate username -> error 409
+  ---
+  duration_ms: 98.330459
+  type: 'test'
+  ...
+# Subtest: TC03 [FR1] short password (abc) -> rejected
+ok 3 - TC03 [FR1] short password (abc) -> rejected
+  ---
+  duration_ms: 39.560196
+  type: 'test'
+  ...
+# Subtest: TC04 [FR1] invalid username "a b" -> rejected
+ok 4 - TC04 [FR1] invalid username "a b" -> rejected
+  ---
+  duration_ms: 44.508681
+  type: 'test'
+  ...
+# Subtest: TC05 [FR1] invalid email "abc" -> rejected
+ok 5 - TC05 [FR1] invalid email "abc" -> rejected
+  ---
+  duration_ms: 45.503413
+  type: 'test'
+  ...
+# Subtest: TC06 [FR1] invalid phone 12345 -> rejected
+ok 6 - TC06 [FR1] invalid phone 12345 -> rejected
+  ---
+  duration_ms: 45.374689
+  type: 'test'
+  ...
+# Subtest: TC07 [FR2] login with correct credentials -> success
+ok 7 - TC07 [FR2] login with correct credentials -> success
+  ---
+  duration_ms: 142.257289
+  type: 'test'
+  ...
+# Subtest: TC08 [FR2] wrong password -> Invalid username or password
+ok 8 - TC08 [FR2] wrong password -> Invalid username or password
+  ---
+  duration_ms: 158.159597
+  type: 'test'
+  ...
+# Subtest: TC09 [FR2] unknown user -> same error message
+ok 9 - TC09 [FR2] unknown user -> same error message
+  ---
+  duration_ms: 107.178576
+  type: 'test'
+  ...
+# Subtest: TC10 [FR2] five wrong attempts lock the account for a while -> 429
+ok 10 - TC10 [FR2] five wrong attempts lock the account for a while -> 429
+  ---
+  duration_ms: 378.73025
+  type: 'test'
+  ...
+# Subtest: TC11 [FR3] catalogue shows 10 products
+ok 11 - TC11 [FR3] catalogue shows 10 products
+  ---
+  duration_ms: 96.567337
+  type: 'test'
+  ...
+# Subtest: TC12 [FR3] search "SHIRT" (case-insensitive) -> 1 result
+ok 12 - TC12 [FR3] search "SHIRT" (case-insensitive) -> 1 result
+  ---
+  duration_ms: 104.522084
+  type: 'test'
+  ...
+# Subtest: TC13 [FR3] search with no match -> 0 results
+ok 13 - TC13 [FR3] search with no match -> 0 results
+  ---
+  duration_ms: 107.449702
+  type: 'test'
+  ...
+# Subtest: TC14 [FR3] search with undefined/null parameters -> all products (regression)
+ok 14 - TC14 [FR3] search with undefined/null parameters -> all products (regression)
+  ---
+  duration_ms: 236.977659
+  type: 'test'
+  ...
+# Subtest: TC15 [FR4] filter by type Electronics -> 3 products
+ok 15 - TC15 [FR4] filter by type Electronics -> 3 products
+  ---
+  duration_ms: 111.334937
+  type: 'test'
+  ...
+# Subtest: TC16 [FR4] filter by colour Black -> 3 products
+ok 16 - TC16 [FR4] filter by colour Black -> 3 products
+  ---
+  duration_ms: 103.460328
+  type: 'test'
+  ...
+# Subtest: TC17 [FR4] price range 500 to 1500 -> 3 products (Mouse, Charger, Lamp)
+ok 17 - TC17 [FR4] price range 500 to 1500 -> 3 products (Mouse, Charger, Lamp)
+  ---
+  duration_ms: 103.73351
+  type: 'test'
+  ...
+# Subtest: TC18 [FR4] type + colour + max price combined -> Wireless Mouse only
+ok 18 - TC18 [FR4] type + colour + max price combined -> Wireless Mouse only
+  ---
+  duration_ms: 106.960555
+  type: 'test'
+  ...
+# Subtest: TC19 [FR4] max below min -> Invalid price range
+ok 19 - TC19 [FR4] max below min -> Invalid price range
+  ---
+  duration_ms: 102.965411
+  type: 'test'
+  ...
+# Subtest: TC20 [FR4] sort by price ascending -> Rs.275 first, Rs.3299 last
+ok 20 - TC20 [FR4] sort by price ascending -> Rs.275 first, Rs.3299 last
+  ---
+  duration_ms: 96.463253
+  type: 'test'
+  ...
+# Subtest: TC21 [FR5] save a delivery address -> stored
+ok 21 - TC21 [FR5] save a delivery address -> stored
+  ---
+  duration_ms: 99.685276
+  type: 'test'
+  ...
+# Subtest: TC22 [FR5] address with bad PIN 0123 -> rejected
+ok 22 - TC22 [FR5] address with bad PIN 0123 -> rejected
+  ---
+  duration_ms: 94.903852
+  type: 'test'
+  ...
+# Subtest: TC23 [FR5] sixth saved address -> rejected (max 5)
+ok 23 - TC23 [FR5] sixth saved address -> rejected (max 5)
+  ---
+  duration_ms: 78.5894
+  type: 'test'
+  ...
+# Subtest: TC24 [FR5] delete a saved address -> removed
+ok 24 - TC24 [FR5] delete a saved address -> removed
+  ---
+  duration_ms: 68.322044
+  type: 'test'
+  ...
+# Subtest: TC25 [FR5] save payment mode UPI ravi@okbank -> stored
+ok 25 - TC25 [FR5] save payment mode UPI ravi@okbank -> stored
+  ---
+  duration_ms: 83.661922
+  type: 'test'
+  ...
+# Subtest: TC26 [FR5] payment mode CARD -> rejected (card numbers are never stored)
+ok 26 - TC26 [FR5] payment mode CARD -> rejected (card numbers are never stored)
+  ---
+  duration_ms: 86.030504
+  type: 'test'
+  ...
+# Subtest: TC27 [FR5] invalid UPI id "ravi" -> rejected
+ok 27 - TC27 [FR5] invalid UPI id "ravi" -> rejected
+  ---
+  duration_ms: 79.860953
+  type: 'test'
+  ...
+# Subtest: TC28 [FR5] checkout using saved address and saved payment -> order placed
+ok 28 - TC28 [FR5] checkout using saved address and saved payment -> order placed
+  ---
+  duration_ms: 90.736779
+  type: 'test'
+  ...
+# Subtest: TC29 [FR6] add Mouse x2 to cart -> subtotal 1598
+ok 29 - TC29 [FR6] add Mouse x2 to cart -> subtotal 1598
+  ---
+  duration_ms: 77.696513
+  type: 'test'
+  ...
+# Subtest: TC30 [FR6] add same product twice (1+2) -> one line, quantity 3
+ok 30 - TC30 [FR6] add same product twice (1+2) -> one line, quantity 3
+  ---
+  duration_ms: 74.58773
+  type: 'test'
+  ...
+# Subtest: TC31 [FR6] quantity 0, -1, 1.5 -> rejected
+ok 31 - TC31 [FR6] quantity 0, -1, 1.5 -> rejected
+  ---
+  duration_ms: 70.113361
+  type: 'test'
+  ...
+# Subtest: TC32 [FR6] quantity above 10 in total -> Maximum 10
+ok 32 - TC32 [FR6] quantity above 10 in total -> Maximum 10
+  ---
+  duration_ms: 79.225052
+  type: 'test'
+  ...
+# Subtest: TC33 [FR6] Jacket x9 (stock 8) -> Only 8 in stock
+ok 33 - TC33 [FR6] Jacket x9 (stock 8) -> Only 8 in stock
+  ---
+  duration_ms: 68.334455
+  type: 'test'
+  ...
+# Subtest: TC34 [FR6] unknown product id 99 -> No product
+ok 34 - TC34 [FR6] unknown product id 99 -> No product
+  ---
+  duration_ms: 67.281523
+  type: 'test'
+  ...
+# Subtest: TC35 [FR6] set quantity 0 -> line removed
+ok 35 - TC35 [FR6] set quantity 0 -> line removed
+  ---
+  duration_ms: 66.09837
+  type: 'test'
+  ...
+# Subtest: TC36 [FR6] update item not in cart -> error
+ok 36 - TC36 [FR6] update item not in cart -> error
+  ---
+  duration_ms: 66.158328
+  type: 'test'
+  ...
+# Subtest: TC37 [FR6] save product to wishlist -> listed
+ok 37 - TC37 [FR6] save product to wishlist -> listed
+  ---
+  duration_ms: 64.76983
+  type: 'test'
+  ...
+# Subtest: TC38 [FR6] remove from wishlist; remove again -> second is an error
+ok 38 - TC38 [FR6] remove from wishlist; remove again -> second is an error
+  ---
+  duration_ms: 63.758324
+  type: 'test'
+  ...
+# Subtest: TC39 [FR6] move wishlist item to cart -> in cart, not in wishlist
+ok 39 - TC39 [FR6] move wishlist item to cart -> in cart, not in wishlist
+  ---
+  duration_ms: 64.260993
+  type: 'test'
+  ...
+# Subtest: TC40 [FR6] cart and wishlist need a logged-in user -> 401
+ok 40 - TC40 [FR6] cart and wishlist need a logged-in user -> 401
+  ---
+  duration_ms: 66.26349
+  type: 'test'
+  ...
+# Subtest: TC41 [FR7] share product 1 -> link /?product=1 and text with name, colour, price
+ok 41 - TC41 [FR7] share product 1 -> link /?product=1 and text with name, colour, price
+  ---
+  duration_ms: 86.476329
+  type: 'test'
+  ...
+# Subtest: TC42 [FR7] share unknown product -> No product
+ok 42 - TC42 [FR7] share unknown product -> No product
+  ---
+  duration_ms: 93.462116
+  type: 'test'
+  ...
+# Subtest: TC43 [BILL] 2 Mouse, no coupon -> GST 287.64, total 1885.64
+ok 43 - TC43 [BILL] 2 Mouse, no coupon -> GST 287.64, total 1885.64
+  ---
+  duration_ms: 91.822189
+  type: 'test'
+  ...
+# Subtest: TC44 [BILL] SAVE10 (lower-case input) -> discount 159.80, total 1697.08
+ok 44 - TC44 [BILL] SAVE10 (lower-case input) -> discount 159.80, total 1697.08
+  ---
+  duration_ms: 72.49869
+  type: 'test'
+  ...
+# Subtest: TC45 [BILL] FLAT100 below Rs.1000 -> minimum purchase error
+ok 45 - TC45 [BILL] FLAT100 below Rs.1000 -> minimum purchase error
+  ---
+  duration_ms: 83.378367
+  type: 'test'
+  ...
+# Subtest: TC46 [BILL] FLAT100 on Speaker -> discount 100, total 2476.82
+ok 46 - TC46 [BILL] FLAT100 on Speaker -> discount 100, total 2476.82
+  ---
+  duration_ms: 77.57746
+  type: 'test'
+  ...
+# Subtest: TC47 [BILL] invalid coupon FREE -> Invalid coupon
+ok 47 - TC47 [BILL] invalid coupon FREE -> Invalid coupon
+  ---
+  duration_ms: 79.588555
+  type: 'test'
+  ...
+# Subtest: TC48 [BILL] Bottle x1 (Rs.350) -> delivery 40, total 453.00
+ok 48 - TC48 [BILL] Bottle x1 (Rs.350) -> delivery 40, total 453.00
+  ---
+  duration_ms: 83.781281
+  type: 'test'
+  ...
+# Subtest: TC49 [BILL] empty cart -> total 0
+ok 49 - TC49 [BILL] empty cart -> total 0
+  ---
+  duration_ms: 80.710509
+  type: 'test'
+  ...
+# Subtest: TC50 [ORDER] checkout 2 Mouse -> PLACED, stock 23, cart empty
+ok 50 - TC50 [ORDER] checkout 2 Mouse -> PLACED, stock 23, cart empty
+  ---
+  duration_ms: 83.316132
+  type: 'test'
+  ...
+# Subtest: TC51 [ORDER] checkout with empty cart -> Cart is empty
+ok 51 - TC51 [ORDER] checkout with empty cart -> Cart is empty
+  ---
+  duration_ms: 76.874892
+  type: 'test'
+  ...
+# Subtest: TC52 [ORDER] phone 12345 at checkout -> error, stock and cart unchanged
+ok 52 - TC52 [ORDER] phone 12345 at checkout -> error, stock and cart unchanged
+  ---
+  duration_ms: 80.212766
+  type: 'test'
+  ...
+# Subtest: TC53 [ORDER] invalid UPI id "john" -> error, nothing changes
+ok 53 - TC53 [ORDER] invalid UPI id "john" -> error, nothing changes
+  ---
+  duration_ms: 70.934501
+  type: 'test'
+  ...
+# Subtest: TC54 [ORDER] COD above Rs.10000 (4 shoes) -> rejected, stock unchanged
+ok 54 - TC54 [ORDER] COD above Rs.10000 (4 shoes) -> rejected, stock unchanged
+  ---
+  duration_ms: 83.829554
+  type: 'test'
+  ...
+# Subtest: TC55 [FR8] new order tracking -> status PLACED with 1 history entry
+ok 55 - TC55 [FR8] new order tracking -> status PLACED with 1 history entry
+  ---
+  duration_ms: 88.167958
+  type: 'test'
+  ...
+# Subtest: TC56 [FR8] admin advances order PLACED -> PACKED -> SHIPPED -> DELIVERED
+ok 56 - TC56 [FR8] admin advances order PLACED -> PACKED -> SHIPPED -> DELIVERED
+  ---
+  duration_ms: 74.167316
+  type: 'test'
+  ...
+# Subtest: TC57 [FR8] advance a delivered order -> already delivered
+ok 57 - TC57 [FR8] advance a delivered order -> already delivered
+  ---
+  duration_ms: 64.374107
+  type: 'test'
+  ...
+# Subtest: TC58 [FR8] customer tries to advance an order -> 403
+ok 58 - TC58 [FR8] customer tries to advance an order -> 403
+  ---
+  duration_ms: 68.057669
+  type: 'test'
+  ...
+# Subtest: TC59 [FR8] track another user's order -> not found
+ok 59 - TC59 [FR8] track another user's order -> not found
+  ---
+  duration_ms: 100.098596
+  type: 'test'
+  ...
+# Subtest: TC60 [FR9] cancel placed order -> CANCELLED, stock restored to 25
+ok 60 - TC60 [FR9] cancel placed order -> CANCELLED, stock restored to 25
+  ---
+  duration_ms: 71.47472
+  type: 'test'
+  ...
+# Subtest: TC61 [FR9] cancel twice -> already cancelled
+ok 61 - TC61 [FR9] cancel twice -> already cancelled
+  ---
+  duration_ms: 72.568623
+  type: 'test'
+  ...
+# Subtest: TC62 [FR9] cancel after packing -> only a placed order can be cancelled
+ok 62 - TC62 [FR9] cancel after packing -> only a placed order can be cancelled
+  ---
+  duration_ms: 68.187835
+  type: 'test'
+  ...
+# Subtest: TC63 [FR9] another user cancels the order -> not found
+ok 63 - TC63 [FR9] another user cancels the order -> not found
+  ---
+  duration_ms: 99.960913
+  type: 'test'
+  ...
+# Subtest: TC64 [FR9] reorder a past order -> same products back in cart
+ok 64 - TC64 [FR9] reorder a past order -> same products back in cart
+  ---
+  duration_ms: 67.588641
+  type: 'test'
+  ...
+# Subtest: TC65 [FR9] reorder when product is sold out -> error, cart unchanged
+ok 65 - TC65 [FR9] reorder when product is sold out -> error, cart unchanged
+  ---
+  duration_ms: 66.839834
+  type: 'test'
+  ...
+# Subtest: TC66 [FR10] customer care phone and email are available
+ok 66 - TC66 [FR10] customer care phone and email are available
+  ---
+  duration_ms: 65.642673
+  type: 'test'
+  ...
+# Subtest: TC67 [FR10] raise a complaint -> OPEN
+ok 67 - TC67 [FR10] raise a complaint -> OPEN
+  ---
+  duration_ms: 64.640679
+  type: 'test'
+  ...
+# Subtest: TC68 [FR10] subject "ab" or message too short -> rejected
+ok 68 - TC68 [FR10] subject "ab" or message too short -> rejected
+  ---
+  duration_ms: 70.207185
+  type: 'test'
+  ...
+# Subtest: TC69 [FR10] user sees only own complaints
+ok 69 - TC69 [FR10] user sees only own complaints
+  ---
+  duration_ms: 101.553752
+  type: 'test'
+  ...
+# Subtest: TC70 [FR10] admin replies -> RESOLVED; customer cannot list all complaints
+ok 70 - TC70 [FR10] admin replies -> RESOLVED; customer cannot list all complaints
+  ---
+  duration_ms: 70.198765
+  type: 'test'
+  ...
+# Subtest: TC71 [FR11] admin adds a product -> listed with next id 11
+ok 71 - TC71 [FR11] admin adds a product -> listed with next id 11
+  ---
+  duration_ms: 81.680896
+  type: 'test'
+  ...
+# Subtest: TC72 [FR11] customer adds a product -> 403
+ok 72 - TC72 [FR11] customer adds a product -> 403
+  ---
+  duration_ms: 98.310582
+  type: 'test'
+  ...
+# Subtest: TC73 [FR11] price 0 or negative stock -> rejected
+ok 73 - TC73 [FR11] price 0 or negative stock -> rejected
+  ---
+  duration_ms: 97.407178
+  type: 'test'
+  ...
+# Subtest: TC74 [FR11] duplicate product name -> 409
+ok 74 - TC74 [FR11] duplicate product name -> 409
+  ---
+  duration_ms: 106.863868
+  type: 'test'
+  ...
+# Subtest: TC75 [FR11] remove product that still has stock -> rejected
+ok 75 - TC75 [FR11] remove product that still has stock -> rejected
+  ---
+  duration_ms: 108.560903
+  type: 'test'
+  ...
+# Subtest: TC76 [FR11] sold-out product (Jacket, all 8 sold) can be removed and disappears from wishlist
+ok 76 - TC76 [FR11] sold-out product (Jacket, all 8 sold) can be removed and disappears from wishlist
+  ---
+  duration_ms: 107.07596
+  type: 'test'
+  ...
+# Subtest: TC77 [FR11] sold-out product cannot be added to cart
+ok 77 - TC77 [FR11] sold-out product cannot be added to cart
+  ---
+  duration_ms: 104.846773
+  type: 'test'
+  ...
+# Subtest: TC78 [FR11] admin restocks +10 -> stock 18
+ok 78 - TC78 [FR11] admin restocks +10 -> stock 18
+  ---
+  duration_ms: 98.56717
+  type: 'test'
+  ...
+# Subtest: TC79 [FR12] delete account with wrong password -> rejected
+ok 79 - TC79 [FR12] delete account with wrong password -> rejected
+  ---
+  duration_ms: 124.903918
+  type: 'test'
+  ...
+# Subtest: TC80 [FR12] delete account -> cannot log in again, orders anonymised
+ok 80 - TC80 [FR12] delete account -> cannot log in again, orders anonymised
+  ---
+  duration_ms: 137.050501
+  type: 'test'
+  ...
+# Subtest: TC81 [FR12] administrator account cannot be deleted
+ok 81 - TC81 [FR12] administrator account cannot be deleted
+  ---
+  duration_ms: 106.602752
+  type: 'test'
+  ...
+# Subtest: TC82 [NFR1] password is stored only as a salted hash
+ok 82 - TC82 [NFR1] password is stored only as a salted hash
+  ---
+  duration_ms: 106.215121
+  type: 'test'
+  ...
+# Subtest: TC83 [NFR1] two users with the same password get different hashes (salt)
+ok 83 - TC83 [NFR1] two users with the same password get different hashes (salt)
+  ---
+  duration_ms: 157.173413
+  type: 'test'
+  ...
+# Subtest: TC84 [NFR1] saved payment contains only mode/UPI id, never card data
+ok 84 - TC84 [NFR1] saved payment contains only mode/UPI id, never card data
+  ---
+  duration_ms: 105.690427
+  type: 'test'
+  ...
+# Subtest: TC85 [NFR1] users cannot see each other's orders or carts
+ok 85 - TC85 [NFR1] users cannot see each other's orders or carts
+  ---
+  duration_ms: 158.702772
+  type: 'test'
+  ...
+# Subtest: TC86 [NFR1] HTTP: private pages without login -> 401
+ok 86 - TC86 [NFR1] HTTP: private pages without login -> 401
+  ---
+  duration_ms: 107.807342
+  type: 'test'
+  ...
+# Subtest: TC87 [NFR1] HTTP: change request without custom header -> 403
+ok 87 - TC87 [NFR1] HTTP: change request without custom header -> 403
+  ---
+  duration_ms: 9.30792
+  type: 'test'
+  ...
+# Subtest: TC88 [NFR1] HTTP: customer opening admin routes -> 403
+ok 88 - TC88 [NFR1] HTTP: customer opening admin routes -> 403
+  ---
+  duration_ms: 58.143879
+  type: 'test'
+  ...
+# Subtest: TC89 [NFR1] HTTP: session cookie is HttpOnly and SameSite=Strict
+ok 89 - TC89 [NFR1] HTTP: session cookie is HttpOnly and SameSite=Strict
+  ---
+  duration_ms: 48.461007
+  type: 'test'
+  ...
+# Subtest: TC90 [NFR1] HTTP: broken JSON -> 400, unknown route -> 404
+ok 90 - TC90 [NFR1] HTTP: broken JSON -> 400, unknown route -> 404
+  ---
+  duration_ms: 5.03737
+  type: 'test'
+  ...
+# Subtest: TC91 [FR2] HTTP: login, view profile, logout, profile again -> 200 then 401
+ok 91 - TC91 [FR2] HTTP: login, view profile, logout, profile again -> 200 then 401
+  ---
+  duration_ms: 41.430094
+  type: 'test'
+  ...
+# Subtest: TC92 [FR12] HTTP: delete account then old session is rejected
+ok 92 - TC92 [FR12] HTTP: delete account then old session is rejected
+  ---
+  duration_ms: 77.483224
+  type: 'test'
+  ...
+# Subtest: TC93 [NFR2] HTTP: 20 users order the last 5 units at the same time -> exactly 5 succeed, stock 0, no overselling
+ok 93 - TC93 [NFR2] HTTP: 20 users order the last 5 units at the same time -> exactly 5 succeed, stock 0, no overselling
+  ---
+  duration_ms: 452.453446
+  type: 'test'
+  ...
+# Subtest: TC94 [NFR2] HTTP: 200 parallel catalogue requests all succeed
+ok 94 - TC94 [NFR2] HTTP: 200 parallel catalogue requests all succeed
+  ---
+  duration_ms: 153.703883
+  type: 'test'
+  ...
+# Subtest: TC95 [NFR2] searching 10,000 products takes under 50 ms
+ok 95 - TC95 [NFR2] searching 10,000 products takes under 50 ms
+  ---
+  duration_ms: 43.448516
+  type: 'test'
+  ...
+# Subtest: TC96 [NFR2] HTTP: health check reports ok (availability monitoring)
+ok 96 - TC96 [NFR2] HTTP: health check reports ok (availability monitoring)
+  ---
+  duration_ms: 1.618487
+  type: 'test'
+  ...
+# Subtest: TC97 [NFR3] data survives a restart (users, orders, stock reloaded from file)
+ok 97 - TC97 [NFR3] data survives a restart (users, orders, stock reloaded from file)
+  ---
+  duration_ms: 102.80389
+  type: 'test'
+  ...
+# Subtest: TC98 [NFR3] order IDs keep increasing after restart
+ok 98 - TC98 [NFR3] order IDs keep increasing after restart
+  ---
+  duration_ms: 68.640435
+  type: 'test'
+  ...
+1..98
+# tests 98
+# suites 0
+# pass 98
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 9232.327543

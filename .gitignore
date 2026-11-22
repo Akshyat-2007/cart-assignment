@@ -1,0 +1,6 @@
+node_modules/
+data.json
+qc_http_*.json
+*.log
+.DS_Store
+Thumbs.db

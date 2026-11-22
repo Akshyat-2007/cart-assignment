@@ -1,0 +1,16 @@
+{
+  "name": "quickcart",
+  "version": "1.0.0",
+  "description": "Full-stack e-commerce shopping cart web application built with vanilla Node.js",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/shop.test.js",
+    "dev": "node --watch server.js"
+  },
+  "author": "Akshyat Kumar Nayak",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
