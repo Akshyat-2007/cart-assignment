@@ -1,7 +1,7 @@
 const $ = s => document.querySelector(s), H = { 'Content-Type': 'application/json', 'X-Requested-With': 'quickcart' };
 const rs = n => 'Rs.' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const COL = { Electronics: '#0f766e', Clothing: '#7c3aed', Footwear: '#c2410c', Home: '#0369a1', Stationery: '#a16207', Bags: '#be185d' };
-let me = null, cartCount = 0, tab = 'shop';
+let me = null, cartCount = 0, wishCount = 0, tab = 'shop';
 
 function getGuestCart() {
   try { return JSON.parse(localStorage.getItem('qc_guest_cart') || '[]'); } catch { return []; }
@@ -19,6 +19,22 @@ async function syncGuestCart() {
   }
 }
 
+function getGuestWishlist() {
+  try { return JSON.parse(localStorage.getItem('qc_guest_wish') || '[]'); } catch { return []; }
+}
+function setGuestWishlist(ids) {
+  localStorage.setItem('qc_guest_wish', JSON.stringify(ids));
+}
+async function syncGuestWishlist() {
+  const gw = getGuestWishlist();
+  if (gw.length) {
+    for (const id of gw) {
+      try { await api('wishlist/add', { id }); } catch {}
+    }
+    localStorage.removeItem('qc_guest_wish');
+  }
+}
+
 async function api(path, body) {
   const r = await fetch('/api/' + path, body === undefined ? {} : { method: 'POST', headers: H, body: JSON.stringify(body) });
   const d = await r.json(); if (!r.ok) { const e = new Error(d.error); e.status = r.status; throw e; } return d;
@@ -29,23 +45,28 @@ const form = (sel, fn) => { $(sel).onsubmit = async e => { e.preventDefault(); t
 
 function nav() {
   const t = [['shop', 'Shop']];
-  if (me) t.push(['wish', 'Wishlist']);
+  t.push(['wish', wishCount ? `Wishlist <b>${wishCount}</b>` : 'Wishlist']);
   t.push(['cart', `Cart <b>${cartCount}</b>`]);
   if (me) t.push(['orders', 'My Orders'], ['profile', 'Profile']);
   t.push(['help', 'Help']);
   if (me && me.role === 'admin') t.push(['admin', 'Admin']);
   $('#nav').innerHTML = t.map(([k, l]) => `<button data-t="${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('') + (me ? `<button id="lo">Logout (${me.username})</button>` : `<button data-t="auth" class="${tab === 'auth' ? 'on' : ''}">Login / Register</button>`);
   document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => go(b.dataset.t));
-  if ($('#lo')) $('#lo').onclick = async () => { await api('logout', {}); me = null; cartCount = 0; nav(); go('shop'); toast('Logged out'); };
+  if ($('#lo')) $('#lo').onclick = async () => { await api('logout', {}); me = null; cartCount = 0; wishCount = 0; nav(); go('shop'); toast('Logged out'); };
 }
 
 async function refreshCount() {
   if (!me) {
     cartCount = getGuestCart().reduce((n, i) => n + i.qty, 0);
+    wishCount = getGuestWishlist().length;
     return;
   }
-  const c = await api('cart');
-  cartCount = c.items.reduce((n, i) => n + i.qty, 0);
+  const [c, w] = await Promise.all([
+    api('cart').catch(() => ({ items: [] })),
+    api('wishlist').catch(() => [])
+  ]);
+  cartCount = (c.items || []).reduce((n, i) => n + i.qty, 0);
+  wishCount = (w || []).length;
 }
 
 async function go(t) { tab = t; await refreshCount().catch(() => {}); nav(); await ({ shop, wish, cart, orders, profile, help, admin, auth })[t](); }
@@ -58,6 +79,7 @@ async function auth() {
   form('#lf', async d => {
     me = await api('login', d);
     await syncGuestCart();
+    await syncGuestWishlist();
     await refreshCount();
     toast('Welcome ' + me.username);
     go(cartCount > 0 ? 'cart' : 'shop');
@@ -65,6 +87,7 @@ async function auth() {
   form('#rf', async d => {
     me = await api('register', d);
     await syncGuestCart();
+    await syncGuestWishlist();
     await refreshCount();
     toast('Account created');
     go(cartCount > 0 ? 'cart' : 'shop');
@@ -79,11 +102,25 @@ async function shop() {
   <select id="sort"><option value="">Sort: default</option><option value="price_asc">Price: low to high</option><option value="price_desc">Price: high to low</option></select></div><div id="grid" class="grid"></div><p id="empty" hidden>No products match your filters.</p><div id="shop-err"></div>`;
   async function load() {
     try {
-      const qs = new URLSearchParams({ q: $('#q').value, category: $('#cat').value, color: $('#col').value, min: $('#min').value, max: $('#max').value, sort: $('#sort').value }); const list = await api('products?' + qs); err('#shop-err', '');
+      const qs = new URLSearchParams({ q: $('#q').value, category: $('#cat').value, color: $('#col').value, min: $('#min').value, max: $('#max').value, sort: $('#sort').value });
+      const [list, userWish] = await Promise.all([
+        api('products?' + qs),
+        me ? api('wishlist').catch(() => []) : Promise.resolve(getGuestWishlist().map(id => ({ id })))
+      ]);
+      const wishIds = new Set((userWish || []).map(x => x.id));
+      err('#shop-err', '');
       $('#empty').hidden = list.length > 0;
-      $('#grid').innerHTML = list.map(p => `<div class="card ${String(p.id) === hl ? 'hl' : ''}"><div class="thumb" style="background:${COL[p.category] || '#444'}">${p.name[0]}</div><b>${p.name}</b><small>${p.category} | ${p.color}</small><div class="price">${rs(p.price)}</div>
-      ${p.stock === 0 ? '<div class="low">Sold out</div>' : p.stock <= 10 ? `<div class="low">Only ${p.stock} left</div>` : '<small>In stock</small>'}
-      <button class="pri" data-add="${p.id}" ${p.stock === 0 ? 'disabled' : ''}>Add to cart</button><div class="acts"><button class="sec" data-w="${p.id}">&#9825; Wishlist</button><button class="sec" data-s="${p.id}">Share</button></div></div>`).join('');
+      $('#grid').innerHTML = list.map(p => {
+        const inWish = wishIds.has(p.id);
+        return `<div class="card ${String(p.id) === hl ? 'hl' : ''}"><div class="thumb" style="background:${COL[p.category] || '#444'}">${p.name[0]}</div><b>${p.name}</b><small>${p.category} | ${p.color}</small><div class="price">${rs(p.price)}</div>
+        ${p.stock === 0 ? '<div class="low">Sold out</div>' : p.stock <= 10 ? `<div class="low">Only ${p.stock} left</div>` : '<small>In stock</small>'}
+        <button class="pri" data-add="${p.id}" ${p.stock === 0 ? 'disabled' : ''}>Add to cart</button>
+        <div class="acts">
+          <button class="sec" data-w="${p.id}" style="${inWish ? 'color:#be185d;border-color:#be185d' : ''}">${inWish ? '&#9829; Wishlist' : '&#9825; Wishlist'}</button>
+          <button class="sec" data-s="${p.id}">Share</button>
+        </div></div>`;
+      }).join('');
+
       document.querySelectorAll('[data-add]').forEach(b => b.onclick = async () => {
         const id = +b.dataset.add;
         const originalText = b.textContent;
@@ -111,30 +148,157 @@ async function shop() {
           toast(e.message || 'Could not add to cart');
         }
       });
+
       document.querySelectorAll('[data-w]').forEach(b => b.onclick = async () => {
-        if (!me) {
-          toast('Please log in to use your Wishlist');
-          go('auth');
-          return;
-        }
+        const id = +b.dataset.w;
         try {
-          await api('wishlist/add', { id: +b.dataset.w });
-          toast('Saved to wishlist');
+          if (me) {
+            const current = (await api('wishlist').catch(() => [])).map(x => x.id);
+            if (current.includes(id)) {
+              await api('wishlist/remove', { id });
+              b.innerHTML = '&#9825; Wishlist';
+              b.style.color = '';
+              b.style.borderColor = '';
+              toast('Removed from wishlist');
+            } else {
+              await api('wishlist/add', { id });
+              b.innerHTML = '&#9829; Saved!';
+              b.style.color = '#be185d';
+              b.style.borderColor = '#be185d';
+              setTimeout(() => { b.innerHTML = '&#9829; Wishlist'; }, 1200);
+              toast('Saved to wishlist');
+            }
+          } else {
+            let gw = getGuestWishlist();
+            if (gw.includes(id)) {
+              gw = gw.filter(x => x !== id);
+              setGuestWishlist(gw);
+              b.innerHTML = '&#9825; Wishlist';
+              b.style.color = '';
+              b.style.borderColor = '';
+              toast('Removed from wishlist');
+            } else {
+              gw.push(id);
+              setGuestWishlist(gw);
+              b.innerHTML = '&#9829; Saved!';
+              b.style.color = '#be185d';
+              b.style.borderColor = '#be185d';
+              setTimeout(() => { b.innerHTML = '&#9829; Wishlist'; }, 1200);
+              toast('Saved to wishlist');
+            }
+          }
+          await refreshCount();
+          nav();
         } catch (e) {
-          toast(e.message);
+          toast(e.message || 'Could not update wishlist');
         }
       });
-      document.querySelectorAll('[data-s]').forEach(b => b.onclick = async () => { const s = await api('share?id=' + b.dataset.s), link = location.origin + s.url; try { await navigator.clipboard.writeText(s.text + ' ' + link); } catch {} toast('Share link: ' + link); });
+
+      document.querySelectorAll('[data-s]').forEach(b => b.onclick = async () => {
+        const id = +b.dataset.s;
+        const originalText = b.textContent;
+        try {
+          const s = await api('share?id=' + id);
+          const link = location.origin + s.url;
+          const shareText = s.text + ' ' + link;
+
+          let copied = false;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            try {
+              await navigator.clipboard.writeText(shareText);
+              copied = true;
+            } catch {}
+          }
+          if (!copied) {
+            try {
+              const ta = document.createElement('textarea');
+              ta.value = shareText;
+              ta.style.position = 'fixed';
+              ta.style.opacity = '0';
+              document.body.appendChild(ta);
+              ta.focus();
+              ta.select();
+              copied = document.execCommand('copy');
+              document.body.removeChild(ta);
+            } catch {}
+          }
+
+          b.textContent = '✓ Copied!';
+          b.style.borderColor = '#059669';
+          b.style.color = '#059669';
+          setTimeout(() => {
+            b.textContent = originalText;
+            b.style.borderColor = '';
+            b.style.color = '';
+          }, 1500);
+
+          if (navigator.share) {
+            try { await navigator.share({ title: 'QuickCart', text: s.text, url: link }); } catch {}
+          }
+
+          toast('Link copied! Share link: ' + link);
+        } catch (e) {
+          toast(e.message || 'Could not share');
+        }
+      });
     } catch (e) { err('#shop-err', e.message); }
   }
   ['q', 'cat', 'col', 'min', 'max', 'sort'].forEach(i => $('#' + i).addEventListener('input', load)); load();
 }
 
 async function wish() {
-  if (!me) return needLogin(); const w = await api('wishlist');
-  $('#main').innerHTML = '<h2>My Wishlist</h2>' + (w.length ? `<table><tr><th>Product</th><th>Price</th><th></th></tr>${w.map(p => `<tr><td>${p.name} (${p.color})</td><td>${rs(p.price)}</td><td class="flex"><button class="pri" data-c="${p.id}">Move to cart</button><button class="dng" data-r="${p.id}">Remove</button></td></tr>`).join('')}</table>` : '<p>Your wishlist is empty.</p>');
-  document.querySelectorAll('[data-c]').forEach(b => b.onclick = async () => { try { await api('wishlist/tocart', { id: +b.dataset.c }); toast('Moved to cart'); } catch (e) { toast(e.message); } go('wish'); });
-  document.querySelectorAll('[data-r]').forEach(b => b.onclick = async () => { await api('wishlist/remove', { id: +b.dataset.r }); go('wish'); });
+  let w = [];
+  if (me) {
+    w = await api('wishlist');
+  } else {
+    const gw = getGuestWishlist();
+    if (gw.length) {
+      const allProducts = await api('products');
+      w = gw.map(id => allProducts.find(x => x.id === id)).filter(Boolean);
+    }
+  }
+
+  $('#main').innerHTML = '<h2>My Wishlist</h2>' + (w.length ? `<table><tr><th>Product</th><th>Price</th><th></th></tr>${w.map(p => `<tr><td>${p.name} (${p.color})</td><td>${rs(p.price)}</td><td class="flex"><button class="pri" data-c="${p.id}">Move to cart</button><button class="dng" data-r="${p.id}">Remove</button></td></tr>`).join('')}</table>` : '<p>Your wishlist is empty.</p>') +
+  (!me && w.length ? '<div class="box"><p>Log in or create an account to save your wishlist permanently across devices.</p><button class="sec" id="btn-wish-login">Login / Register</button></div>' : '');
+
+  if ($('#btn-wish-login')) $('#btn-wish-login').onclick = () => go('auth');
+
+  document.querySelectorAll('[data-c]').forEach(b => b.onclick = async () => {
+    const id = +b.dataset.c;
+    try {
+      if (me) {
+        await api('wishlist/tocart', { id });
+      } else {
+        let gw = getGuestWishlist().filter(x => x !== id);
+        setGuestWishlist(gw);
+        const gc = getGuestCart();
+        const ex = gc.find(x => x.id === id);
+        if (ex) ex.qty = Math.min(10, ex.qty + 1);
+        else gc.push({ id, qty: 1 });
+        setGuestCart(gc);
+      }
+      toast('Moved to cart');
+    } catch (e) {
+      toast(e.message);
+    }
+    await refreshCount();
+    nav();
+    go('wish');
+  });
+
+  document.querySelectorAll('[data-r]').forEach(b => b.onclick = async () => {
+    const id = +b.dataset.r;
+    if (me) {
+      await api('wishlist/remove', { id });
+    } else {
+      let gw = getGuestWishlist().filter(x => x !== id);
+      setGuestWishlist(gw);
+    }
+    toast('Removed from wishlist');
+    await refreshCount();
+    nav();
+    go('wish');
+  });
 }
 
 // ---------- cart, checkout ----------
