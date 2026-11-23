@@ -2,6 +2,23 @@ const $ = s => document.querySelector(s), H = { 'Content-Type': 'application/jso
 const rs = n => 'Rs.' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const COL = { Electronics: '#0f766e', Clothing: '#7c3aed', Footwear: '#c2410c', Home: '#0369a1', Stationery: '#a16207', Bags: '#be185d' };
 let me = null, cartCount = 0, tab = 'shop';
+
+function getGuestCart() {
+  try { return JSON.parse(localStorage.getItem('qc_guest_cart') || '[]'); } catch { return []; }
+}
+function setGuestCart(items) {
+  localStorage.setItem('qc_guest_cart', JSON.stringify(items));
+}
+async function syncGuestCart() {
+  const gc = getGuestCart();
+  if (gc.length) {
+    for (const item of gc) {
+      try { await api('cart/add', { id: item.id, qty: item.qty }); } catch {}
+    }
+    localStorage.removeItem('qc_guest_cart');
+  }
+}
+
 async function api(path, body) {
   const r = await fetch('/api/' + path, body === undefined ? {} : { method: 'POST', headers: H, body: JSON.stringify(body) });
   const d = await r.json(); if (!r.ok) { const e = new Error(d.error); e.status = r.status; throw e; } return d;
@@ -9,22 +26,51 @@ async function api(path, body) {
 function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('show'); setTimeout(() => e.classList.remove('show'), 2400); }
 const err = (id, m) => { $(id).innerHTML = m ? `<div class="err">${m}</div>` : ''; };
 const form = (sel, fn) => { $(sel).onsubmit = async e => { e.preventDefault(); try { await fn(Object.fromEntries(new FormData(e.target))); } catch (x) { if (x.status === 401 && me) { me = null; nav(); go('auth'); } err(sel + '-err', x.message); } }; };
+
 function nav() {
-  const t = [['shop', 'Shop']]; if (me) t.push(['wish', 'Wishlist'], ['cart', `Cart <b>${cartCount}</b>`], ['orders', 'My Orders'], ['profile', 'Profile']); t.push(['help', 'Help']); if (me && me.role === 'admin') t.push(['admin', 'Admin']);
+  const t = [['shop', 'Shop']];
+  if (me) t.push(['wish', 'Wishlist']);
+  t.push(['cart', `Cart <b>${cartCount}</b>`]);
+  if (me) t.push(['orders', 'My Orders'], ['profile', 'Profile']);
+  t.push(['help', 'Help']);
+  if (me && me.role === 'admin') t.push(['admin', 'Admin']);
   $('#nav').innerHTML = t.map(([k, l]) => `<button data-t="${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('') + (me ? `<button id="lo">Logout (${me.username})</button>` : `<button data-t="auth" class="${tab === 'auth' ? 'on' : ''}">Login / Register</button>`);
   document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => go(b.dataset.t));
   if ($('#lo')) $('#lo').onclick = async () => { await api('logout', {}); me = null; cartCount = 0; nav(); go('shop'); toast('Logged out'); };
 }
-async function refreshCount() { if (!me) { cartCount = 0; return; } const c = await api('cart'); cartCount = c.items.reduce((n, i) => n + i.qty, 0); }
+
+async function refreshCount() {
+  if (!me) {
+    cartCount = getGuestCart().reduce((n, i) => n + i.qty, 0);
+    return;
+  }
+  const c = await api('cart');
+  cartCount = c.items.reduce((n, i) => n + i.qty, 0);
+}
+
 async function go(t) { tab = t; await refreshCount().catch(() => {}); nav(); await ({ shop, wish, cart, orders, profile, help, admin, auth })[t](); }
 function needLogin() { $('#main').innerHTML = '<div class="box">Please log in or register to use this page.</div>'; }
+
 // ---------- FR1, FR2 ----------
 async function auth() {
   $('#main').innerHTML = `<div class="two"><div class="box"><h3>Login</h3><form id="lf"><label>Username</label><input name="username"><label>Password</label><input name="password" type="password"><br><br><button class="pri">Login</button></form><div id="lf-err"></div></div>
   <div class="box"><h3>New user? Register</h3><form id="rf"><label>Username (3-15 letters, digits, _)</label><input name="username"><label>Email</label><input name="email"><label>Phone</label><input name="phone"><label>Password (min 6)</label><input name="password" type="password"><br><br><button class="pri">Create account</button></form><div id="rf-err"></div></div></div>`;
-  form('#lf', async d => { me = await api('login', d); toast('Welcome ' + me.username); go('shop'); });
-  form('#rf', async d => { me = await api('register', d); toast('Account created'); go('shop'); });
+  form('#lf', async d => {
+    me = await api('login', d);
+    await syncGuestCart();
+    await refreshCount();
+    toast('Welcome ' + me.username);
+    go(cartCount > 0 ? 'cart' : 'shop');
+  });
+  form('#rf', async d => {
+    me = await api('register', d);
+    await syncGuestCart();
+    await refreshCount();
+    toast('Account created');
+    go(cartCount > 0 ? 'cart' : 'shop');
+  });
 }
+
 // ---------- FR3, FR4, FR6, FR7 ----------
 async function shop() {
   const f = await api('filters'), hl = new URLSearchParams(location.search).get('product');
@@ -38,25 +84,116 @@ async function shop() {
       $('#grid').innerHTML = list.map(p => `<div class="card ${String(p.id) === hl ? 'hl' : ''}"><div class="thumb" style="background:${COL[p.category] || '#444'}">${p.name[0]}</div><b>${p.name}</b><small>${p.category} | ${p.color}</small><div class="price">${rs(p.price)}</div>
       ${p.stock === 0 ? '<div class="low">Sold out</div>' : p.stock <= 10 ? `<div class="low">Only ${p.stock} left</div>` : '<small>In stock</small>'}
       <button class="pri" data-add="${p.id}" ${p.stock === 0 ? 'disabled' : ''}>Add to cart</button><div class="acts"><button class="sec" data-w="${p.id}">&#9825; Wishlist</button><button class="sec" data-s="${p.id}">Share</button></div></div>`).join('');
-      document.querySelectorAll('[data-add]').forEach(b => b.onclick = async () => { try { await api('cart/add', { id: +b.dataset.add, qty: 1 }); await refreshCount(); nav(); toast('Added to cart'); } catch (e) { toast(e.status === 401 ? 'Please log in first' : e.message); } });
-      document.querySelectorAll('[data-w]').forEach(b => b.onclick = async () => { try { await api('wishlist/add', { id: +b.dataset.w }); toast('Saved to wishlist'); } catch (e) { toast(e.status === 401 ? 'Please log in first' : e.message); } });
+      document.querySelectorAll('[data-add]').forEach(b => b.onclick = async () => {
+        const id = +b.dataset.add;
+        const originalText = b.textContent;
+        try {
+          if (me) {
+            await api('cart/add', { id, qty: 1 });
+          } else {
+            const gc = getGuestCart();
+            const existing = gc.find(x => x.id === id);
+            if (existing) {
+              if (existing.qty >= 10) throw new Error('Maximum 10 units allowed per product');
+              existing.qty += 1;
+            } else {
+              gc.push({ id, qty: 1 });
+            }
+            setGuestCart(gc);
+          }
+          await refreshCount();
+          nav();
+          b.textContent = '✓ Added!';
+          b.style.background = '#059669';
+          setTimeout(() => { b.textContent = originalText; b.style.background = ''; }, 1200);
+          toast('Added to cart!');
+        } catch (e) {
+          toast(e.message || 'Could not add to cart');
+        }
+      });
+      document.querySelectorAll('[data-w]').forEach(b => b.onclick = async () => {
+        if (!me) {
+          toast('Please log in to use your Wishlist');
+          go('auth');
+          return;
+        }
+        try {
+          await api('wishlist/add', { id: +b.dataset.w });
+          toast('Saved to wishlist');
+        } catch (e) {
+          toast(e.message);
+        }
+      });
       document.querySelectorAll('[data-s]').forEach(b => b.onclick = async () => { const s = await api('share?id=' + b.dataset.s), link = location.origin + s.url; try { await navigator.clipboard.writeText(s.text + ' ' + link); } catch {} toast('Share link: ' + link); });
     } catch (e) { err('#shop-err', e.message); }
   }
   ['q', 'cat', 'col', 'min', 'max', 'sort'].forEach(i => $('#' + i).addEventListener('input', load)); load();
 }
+
 async function wish() {
   if (!me) return needLogin(); const w = await api('wishlist');
   $('#main').innerHTML = '<h2>My Wishlist</h2>' + (w.length ? `<table><tr><th>Product</th><th>Price</th><th></th></tr>${w.map(p => `<tr><td>${p.name} (${p.color})</td><td>${rs(p.price)}</td><td class="flex"><button class="pri" data-c="${p.id}">Move to cart</button><button class="dng" data-r="${p.id}">Remove</button></td></tr>`).join('')}</table>` : '<p>Your wishlist is empty.</p>');
   document.querySelectorAll('[data-c]').forEach(b => b.onclick = async () => { try { await api('wishlist/tocart', { id: +b.dataset.c }); toast('Moved to cart'); } catch (e) { toast(e.message); } go('wish'); });
   document.querySelectorAll('[data-r]').forEach(b => b.onclick = async () => { await api('wishlist/remove', { id: +b.dataset.r }); go('wish'); });
 }
+
 // ---------- cart, checkout ----------
 const billHtml = b => `<div class="row"><span>Subtotal</span><span>${rs(b.subtotal)}</span></div><div class="row"><span>Discount ${b.coupon ? '(' + b.coupon + ')' : ''}</span><span>- ${rs(b.discount)}</span></div>
  <div class="row"><span>GST (18%)</span><span>${rs(b.gst)}</span></div><div class="row"><span>Delivery</span><span>${b.shipping ? rs(b.shipping) : 'FREE'}</span></div><div class="row tot"><span>Total</span><span>${rs(b.total)}</span></div>`;
+
 async function cart(done = '') {
-  if (!me) return needLogin(); const c = await api('cart'), pr = await api('profile');
   if (done) { $('#main').innerHTML = done; return; }
+  if (!me) {
+    const gc = getGuestCart();
+    if (!gc.length) {
+      $('#main').innerHTML = '<h2>Your Cart</h2><p>Your cart is empty.</p>';
+      return;
+    }
+    const allProducts = await api('products');
+    const items = gc.map(g => {
+      const p = allProducts.find(x => x.id === g.id) || { id: g.id, name: 'Product #' + g.id, price: 0 };
+      return { id: g.id, name: p.name, price: p.price, qty: g.qty, line: rs(p.price * g.qty) };
+    });
+    const subtotal = gc.reduce((s, g) => {
+      const p = allProducts.find(x => x.id === g.id);
+      return s + (p ? p.price * g.qty : 0);
+    }, 0);
+    const gst = Math.round(subtotal * 0.18 * 100) / 100;
+    const shipping = subtotal >= 500 ? 0 : 40;
+    const total = Math.round((subtotal + gst + shipping) * 100) / 100;
+    const bill = { subtotal, coupon: null, discount: 0, gst, shipping, total };
+
+    $('#main').innerHTML = `<h2>Your Cart</h2><table><tr><th>Product</th><th>Price</th><th>Qty</th><th>Total</th><th></th></tr>${items.map(i => `<tr><td>${i.name}</td><td>${rs(i.price)}</td><td><input class="qty" type="number" min="0" max="10" value="${i.qty}" data-q="${i.id}"></td><td>${i.line}</td><td><button class="dng" data-rm="${i.id}">Remove</button></td></tr>`).join('')}</table>
+    <div class="box">${billHtml(bill)}</div>
+    <div class="box">
+      <h3>Ready to Checkout?</h3>
+      <p>Log in or create a quick account to apply discount coupons, save delivery address, and place your order.</p>
+      <button class="pri" id="btn-guest-checkout">Login / Register to Checkout</button>
+    </div>`;
+
+    $('#btn-guest-checkout').onclick = () => go('auth');
+    document.querySelectorAll('[data-q]').forEach(i => i.onchange = async () => {
+      const id = +i.dataset.q, qty = +i.value;
+      let gc = getGuestCart();
+      if (qty <= 0) gc = gc.filter(x => x.id !== id);
+      else { const it = gc.find(x => x.id === id); if (it) it.qty = Math.min(10, qty); }
+      setGuestCart(gc);
+      await refreshCount();
+      nav();
+      go('cart');
+    });
+    document.querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => {
+      const id = +b.dataset.rm;
+      let gc = getGuestCart().filter(x => x.id !== id);
+      setGuestCart(gc);
+      await refreshCount();
+      nav();
+      go('cart');
+    });
+    return;
+  }
+
+  const c = await api('cart'), pr = await api('profile');
   if (!c.items.length) { $('#main').innerHTML = '<h2>Your Cart</h2><p>Your cart is empty.</p>'; return; }
   $('#main').innerHTML = `<h2>Your Cart</h2><table><tr><th>Product</th><th>Price</th><th>Qty</th><th>Total</th><th></th></tr>${c.items.map(i => `<tr><td>${i.name}</td><td>${rs(i.price)}</td><td><input class="qty" type="number" min="0" max="10" value="${i.qty}" data-q="${i.id}"></td><td>${rs(i.line)}</td><td><button class="dng" data-rm="${i.id}">Remove</button></td></tr>`).join('')}</table>
   <div class="box"><form id="cf"><label>Coupon code (SAVE10 or FLAT100)</label><div class="flex"><input name="code" value="${c.bill.coupon || ''}" placeholder="Enter code"><button class="sec">Apply</button></div></form><div id="cf-err"></div>${billHtml(c.bill)}</div>
@@ -70,6 +207,7 @@ async function cart(done = '') {
   form('#cf', async d => { await api('cart/coupon', d); go('cart'); });
   form('#co', async d => { const o = await api('checkout', d); cartCount = 0; nav(); cart(`<h2>Your Cart</h2><div class="ok"><h3>Order #${o.id} placed successfully</h3><p>Payment: ${o.payment} | Total: ${rs(o.bill.total)}</p><p>Delivering to ${o.ship.name}, ${o.ship.address} - ${o.ship.pin}</p><p>Open <b>My Orders</b> to track it.</p></div>`); });
 }
+
 // ---------- FR8, FR9 ----------
 async function orders(trackId) {
   if (!me) return needLogin(); const o = await api('orders');
@@ -81,6 +219,7 @@ async function orders(trackId) {
   document.querySelectorAll('[data-ro]').forEach(b => b.onclick = async () => { try { const r = await api('orders/reorder', { id: +b.dataset.ro }); toast('Added to cart: ' + r.added.join(', ')); await refreshCount(); nav(); } catch (e) { toast(e.message); } });
   if (trackId) show(trackId);
 }
+
 // ---------- FR5, FR12 ----------
 async function profile() {
   if (!me) return needLogin(); const p = await api('profile');
@@ -93,6 +232,7 @@ async function profile() {
   form('#pf', async d => { await api('profile/payment', d); toast('Payment mode saved'); go('profile'); });
   form('#df', async d => { await api('me/delete', d); me = null; cartCount = 0; toast('Account deleted'); go('shop'); });
 }
+
 // ---------- FR10 ----------
 async function help() {
   const c = await api('care'), mine = me ? await api('complaints') : [];
@@ -101,6 +241,7 @@ async function help() {
   <div class="box"><h3>My requests</h3>${mine.length ? mine.map(x => `<div class="row"><span><b>#${x.id} ${x.subject}</b> - ${x.message}${x.reply ? '<br><i>Reply: ' + x.reply + '</i>' : ''}</span><span class="tag ${x.status === 'OPEN' ? 'PLACED' : 'CANCELLED'}" style="background:${x.status === 'OPEN' ? '#b45309' : '#0f766e'}">${x.status}</span></div>`).join('') : '<p class="note">No requests yet.</p>'}</div>` : '<div class="box">Log in to raise a complaint.</div>'}`;
   if (me) form('#hf', async d => { await api('complaints', d); toast('Complaint submitted'); go('help'); });
 }
+
 // ---------- FR11 admin ----------
 async function admin() {
   if (!me || me.role !== 'admin') return needLogin(); const ps = await api('products'), os = await api('admin/orders'), cs = await api('admin/complaints');
@@ -115,4 +256,9 @@ async function admin() {
   document.querySelectorAll('[data-cr]').forEach(b => b.onclick = () => run(() => api('admin/complaints/resolve', { id: +b.dataset.cr, reply: prompt('Reply to the customer') || '' })));
   form('#pa', async d => { await api('admin/product', d); toast('Product added'); go('admin'); });
 }
-(async () => { try { me = await api('me'); } catch {} const hp = new URLSearchParams(location.search).get('product'); go('shop'); })();
+
+(async () => {
+  try { me = await api('me'); } catch {}
+  await refreshCount();
+  go('shop');
+})();
