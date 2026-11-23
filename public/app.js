@@ -2,6 +2,8 @@ const $ = s => document.querySelector(s), H = { 'Content-Type': 'application/jso
 const rs = n => 'Rs.' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const COL = { Electronics: '#0f766e', Clothing: '#7c3aed', Footwear: '#c2410c', Home: '#0369a1', Stationery: '#a16207', Bags: '#be185d' };
 let me = null, cartCount = 0, wishCount = 0, tab = 'shop';
+let currentCartMap = new Map();
+let currentProducts = [];
 
 function getGuestCart() {
   try { return JSON.parse(localStorage.getItem('qc_guest_cart') || '[]'); } catch { return []; }
@@ -52,20 +54,29 @@ function nav() {
   if (me && me.role === 'admin') t.push(['admin', 'Admin']);
   $('#nav').innerHTML = t.map(([k, l]) => `<button data-t="${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('') + (me ? `<button id="lo">Logout (${me.username})</button>` : `<button data-t="auth" class="${tab === 'auth' ? 'on' : ''}">Login / Register</button>`);
   document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => go(b.dataset.t));
-  if ($('#lo')) $('#lo').onclick = async () => { await api('logout', {}); me = null; cartCount = 0; wishCount = 0; nav(); go('shop'); toast('Logged out'); };
+  if ($('#lo')) $('#lo').onclick = async () => { await api('logout', {}); me = null; cartCount = 0; wishCount = 0; currentCartMap.clear(); nav(); go('shop'); toast('Logged out'); };
+}
+
+function getQtyInCart(id) {
+  return currentCartMap.get(id) || 0;
 }
 
 async function refreshCount() {
+  currentCartMap.clear();
   if (!me) {
-    cartCount = getGuestCart().reduce((n, i) => n + i.qty, 0);
+    const gc = getGuestCart();
+    cartCount = gc.reduce((n, i) => n + i.qty, 0);
     wishCount = getGuestWishlist().length;
+    gc.forEach(i => currentCartMap.set(i.id, i.qty));
     return;
   }
   const [c, w] = await Promise.all([
     api('cart').catch(() => ({ items: [] })),
     api('wishlist').catch(() => [])
   ]);
-  cartCount = (c.items || []).reduce((n, i) => n + i.qty, 0);
+  const items = c.items || [];
+  cartCount = items.reduce((n, i) => n + i.qty, 0);
+  items.forEach(i => currentCartMap.set(i.id, i.qty));
   wishCount = (w || []).length;
 }
 
@@ -94,12 +105,200 @@ async function auth() {
   });
 }
 
+function renderCartBtn(p) {
+  if (p.stock === 0) {
+    return `<button class="pri" disabled>Sold out</button>`;
+  }
+  const qty = getQtyInCart(p.id);
+  if (qty > 0) {
+    const maxQty = Math.min(10, p.stock);
+    return `<div class="cart-stepper" data-prod="${p.id}">
+      <button class="step-btn dec" data-dec="${p.id}" title="Decrease quantity" aria-label="Decrease">&minus;</button>
+      <button class="pri step-main" data-add="${p.id}" title="Click to add more" aria-label="Add more">
+        <span class="step-title">&#10003; Added to cart: <b>${qty}</b></span>
+        <span class="step-val">Total: <b>${rs(p.price * qty)}</b></span>
+      </button>
+      <button class="step-btn inc" data-inc="${p.id}" title="Increase quantity" aria-label="Increase" ${qty >= maxQty ? 'disabled' : ''}>+</button>
+    </div>`;
+  }
+  return `<button class="pri" data-add="${p.id}">Add to cart</button>`;
+}
+
 // ---------- FR3, FR4, FR6, FR7 ----------
 async function shop() {
   const f = await api('filters'), hl = new URLSearchParams(location.search).get('product');
   $('#main').innerHTML = `<div class="bar"><input id="q" placeholder="Search name, type or colour"><select id="cat"><option value="">All types</option>${f.categories.map(c => `<option>${c}</option>`).join('')}</select>
   <select id="col"><option value="">All colours</option>${f.colors.map(c => `<option>${c}</option>`).join('')}</select><input id="min" type="number" placeholder="Min Rs."><input id="max" type="number" placeholder="Max Rs.">
   <select id="sort"><option value="">Sort: default</option><option value="price_asc">Price: low to high</option><option value="price_desc">Price: high to low</option></select></div><div id="grid" class="grid"></div><p id="empty" hidden>No products match your filters.</p><div id="shop-err"></div>`;
+
+  async function handleAdd(id) {
+    const p = currentProducts.find(x => x.id === id);
+    if (!p) return;
+    const current = getQtyInCart(id);
+    const maxQty = Math.min(10, p.stock);
+    if (current >= maxQty) {
+      toast(current >= p.stock ? `Only ${p.stock} in stock` : 'Maximum 10 units allowed per product');
+      return;
+    }
+    try {
+      if (me) {
+        await api('cart/add', { id, qty: 1 });
+      } else {
+        const gc = getGuestCart();
+        const existing = gc.find(x => x.id === id);
+        if (existing) {
+          existing.qty += 1;
+        } else {
+          gc.push({ id, qty: 1 });
+        }
+        setGuestCart(gc);
+      }
+      await refreshCount();
+      nav();
+      updateCard(id);
+      const newQty = getQtyInCart(id);
+      toast(`Added to cart (Qty: ${newQty}) • Total: ${rs(p.price * newQty)}`);
+    } catch (e) {
+      toast(e.message || 'Could not add to cart');
+    }
+  }
+
+  async function handleDec(id) {
+    const p = currentProducts.find(x => x.id === id);
+    if (!p) return;
+    const current = getQtyInCart(id);
+    const newQty = Math.max(0, current - 1);
+    try {
+      if (me) {
+        await api('cart/set', { id, qty: newQty });
+      } else {
+        let gc = getGuestCart();
+        if (newQty <= 0) {
+          gc = gc.filter(x => x.id !== id);
+        } else {
+          const existing = gc.find(x => x.id === id);
+          if (existing) existing.qty = newQty;
+        }
+        setGuestCart(gc);
+      }
+      await refreshCount();
+      nav();
+      updateCard(id);
+      toast(newQty > 0 ? `Cart updated (Qty: ${newQty}) • Total: ${rs(p.price * newQty)}` : 'Removed from cart');
+    } catch (e) {
+      toast(e.message || 'Could not update cart');
+    }
+  }
+
+  function updateCard(id) {
+    const p = currentProducts.find(x => x.id === id);
+    if (!p) return;
+    const slot = document.querySelector(`.card[data-id="${id}"] .btn-slot`);
+    if (slot) {
+      slot.innerHTML = renderCartBtn(p);
+      attachCardListeners(document.querySelector(`.card[data-id="${id}"]`));
+    }
+  }
+
+  function attachCardListeners(cardEl) {
+    cardEl.querySelectorAll('[data-add]').forEach(b => b.onclick = e => { e.stopPropagation(); handleAdd(+b.dataset.add); });
+    cardEl.querySelectorAll('[data-inc]').forEach(b => b.onclick = e => { e.stopPropagation(); handleAdd(+b.dataset.inc); });
+    cardEl.querySelectorAll('[data-dec]').forEach(b => b.onclick = e => { e.stopPropagation(); handleDec(+b.dataset.dec); });
+    cardEl.querySelectorAll('[data-w]').forEach(b => b.onclick = async e => {
+      e.stopPropagation();
+      const id = +b.dataset.w;
+      try {
+        if (me) {
+          const current = (await api('wishlist').catch(() => [])).map(x => x.id);
+          if (current.includes(id)) {
+            await api('wishlist/remove', { id });
+            b.innerHTML = '&#9825; Wishlist';
+            b.style.color = '';
+            b.style.borderColor = '';
+            toast('Removed from wishlist');
+          } else {
+            await api('wishlist/add', { id });
+            b.innerHTML = '&#9829; Saved!';
+            b.style.color = '#be185d';
+            b.style.borderColor = '#be185d';
+            setTimeout(() => { b.innerHTML = '&#9829; Wishlist'; }, 1200);
+            toast('Saved to wishlist');
+          }
+        } else {
+          let gw = getGuestWishlist();
+          if (gw.includes(id)) {
+            gw = gw.filter(x => x !== id);
+            setGuestWishlist(gw);
+            b.innerHTML = '&#9825; Wishlist';
+            b.style.color = '';
+            b.style.borderColor = '';
+            toast('Removed from wishlist');
+          } else {
+            gw.push(id);
+            setGuestWishlist(gw);
+            b.innerHTML = '&#9829; Saved!';
+            b.style.color = '#be185d';
+            b.style.borderColor = '#be185d';
+            setTimeout(() => { b.innerHTML = '&#9829; Wishlist'; }, 1200);
+            toast('Saved to wishlist');
+          }
+        }
+        await refreshCount();
+        nav();
+      } catch (err) {
+        toast(err.message || 'Could not update wishlist');
+      }
+    });
+    cardEl.querySelectorAll('[data-s]').forEach(b => b.onclick = async e => {
+      e.stopPropagation();
+      const id = +b.dataset.s;
+      const originalText = b.textContent;
+      try {
+        const s = await api('share?id=' + id);
+        const link = location.origin + s.url;
+        const shareText = s.text + ' ' + link;
+
+        let copied = false;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          try {
+            await navigator.clipboard.writeText(shareText);
+            copied = true;
+          } catch {}
+        }
+        if (!copied) {
+          try {
+            const ta = document.createElement('textarea');
+            ta.value = shareText;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            copied = document.execCommand('copy');
+            document.body.removeChild(ta);
+          } catch {}
+        }
+
+        b.textContent = '✓ Copied!';
+        b.style.borderColor = '#059669';
+        b.style.color = '#059669';
+        setTimeout(() => {
+          b.textContent = originalText;
+          b.style.borderColor = '';
+          b.style.color = '';
+        }, 1500);
+
+        if (navigator.share) {
+          try { await navigator.share({ title: 'QuickCart', text: s.text, url: link }); } catch {}
+        }
+
+        toast('Link copied! Share link: ' + link);
+      } catch (err) {
+        toast(err.message || 'Could not share');
+      }
+    });
+  }
+
   async function load() {
     try {
       const qs = new URLSearchParams({ q: $('#q').value, category: $('#cat').value, color: $('#col').value, min: $('#min').value, max: $('#max').value, sort: $('#sort').value });
@@ -107,140 +306,27 @@ async function shop() {
         api('products?' + qs),
         me ? api('wishlist').catch(() => []) : Promise.resolve(getGuestWishlist().map(id => ({ id })))
       ]);
+      currentProducts = list;
       const wishIds = new Set((userWish || []).map(x => x.id));
       err('#shop-err', '');
       $('#empty').hidden = list.length > 0;
       $('#grid').innerHTML = list.map(p => {
         const inWish = wishIds.has(p.id);
-        return `<div class="card ${String(p.id) === hl ? 'hl' : ''}"><div class="thumb" style="background:${COL[p.category] || '#444'}">${p.name[0]}</div><b>${p.name}</b><small>${p.category} | ${p.color}</small><div class="price">${rs(p.price)}</div>
-        ${p.stock === 0 ? '<div class="low">Sold out</div>' : p.stock <= 10 ? `<div class="low">Only ${p.stock} left</div>` : '<small>In stock</small>'}
-        <button class="pri" data-add="${p.id}" ${p.stock === 0 ? 'disabled' : ''}>Add to cart</button>
-        <div class="acts">
-          <button class="sec" data-w="${p.id}" style="${inWish ? 'color:#be185d;border-color:#be185d' : ''}">${inWish ? '&#9829; Wishlist' : '&#9825; Wishlist'}</button>
-          <button class="sec" data-s="${p.id}">Share</button>
-        </div></div>`;
+        return `<div class="card ${String(p.id) === hl ? 'hl' : ''}" data-id="${p.id}">
+          <div class="thumb" style="background:${COL[p.category] || '#444'}">${p.name[0]}</div>
+          <b>${p.name}</b>
+          <small>${p.category} | ${p.color}</small>
+          <div class="price">${rs(p.price)}</div>
+          ${p.stock === 0 ? '<div class="low">Sold out</div>' : p.stock <= 10 ? `<div class="low">Only ${p.stock} left</div>` : '<small>In stock</small>'}
+          <div class="btn-slot">${renderCartBtn(p)}</div>
+          <div class="acts">
+            <button class="sec" data-w="${p.id}" style="${inWish ? 'color:#be185d;border-color:#be185d' : ''}">${inWish ? '&#9829; Wishlist' : '&#9825; Wishlist'}</button>
+            <button class="sec" data-s="${p.id}">Share</button>
+          </div>
+        </div>`;
       }).join('');
 
-      document.querySelectorAll('[data-add]').forEach(b => b.onclick = async () => {
-        const id = +b.dataset.add;
-        const originalText = b.textContent;
-        try {
-          if (me) {
-            await api('cart/add', { id, qty: 1 });
-          } else {
-            const gc = getGuestCart();
-            const existing = gc.find(x => x.id === id);
-            if (existing) {
-              if (existing.qty >= 10) throw new Error('Maximum 10 units allowed per product');
-              existing.qty += 1;
-            } else {
-              gc.push({ id, qty: 1 });
-            }
-            setGuestCart(gc);
-          }
-          await refreshCount();
-          nav();
-          b.textContent = '✓ Added!';
-          b.style.background = '#059669';
-          setTimeout(() => { b.textContent = originalText; b.style.background = ''; }, 1200);
-          toast('Added to cart!');
-        } catch (e) {
-          toast(e.message || 'Could not add to cart');
-        }
-      });
-
-      document.querySelectorAll('[data-w]').forEach(b => b.onclick = async () => {
-        const id = +b.dataset.w;
-        try {
-          if (me) {
-            const current = (await api('wishlist').catch(() => [])).map(x => x.id);
-            if (current.includes(id)) {
-              await api('wishlist/remove', { id });
-              b.innerHTML = '&#9825; Wishlist';
-              b.style.color = '';
-              b.style.borderColor = '';
-              toast('Removed from wishlist');
-            } else {
-              await api('wishlist/add', { id });
-              b.innerHTML = '&#9829; Saved!';
-              b.style.color = '#be185d';
-              b.style.borderColor = '#be185d';
-              setTimeout(() => { b.innerHTML = '&#9829; Wishlist'; }, 1200);
-              toast('Saved to wishlist');
-            }
-          } else {
-            let gw = getGuestWishlist();
-            if (gw.includes(id)) {
-              gw = gw.filter(x => x !== id);
-              setGuestWishlist(gw);
-              b.innerHTML = '&#9825; Wishlist';
-              b.style.color = '';
-              b.style.borderColor = '';
-              toast('Removed from wishlist');
-            } else {
-              gw.push(id);
-              setGuestWishlist(gw);
-              b.innerHTML = '&#9829; Saved!';
-              b.style.color = '#be185d';
-              b.style.borderColor = '#be185d';
-              setTimeout(() => { b.innerHTML = '&#9829; Wishlist'; }, 1200);
-              toast('Saved to wishlist');
-            }
-          }
-          await refreshCount();
-          nav();
-        } catch (e) {
-          toast(e.message || 'Could not update wishlist');
-        }
-      });
-
-      document.querySelectorAll('[data-s]').forEach(b => b.onclick = async () => {
-        const id = +b.dataset.s;
-        const originalText = b.textContent;
-        try {
-          const s = await api('share?id=' + id);
-          const link = location.origin + s.url;
-          const shareText = s.text + ' ' + link;
-
-          let copied = false;
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            try {
-              await navigator.clipboard.writeText(shareText);
-              copied = true;
-            } catch {}
-          }
-          if (!copied) {
-            try {
-              const ta = document.createElement('textarea');
-              ta.value = shareText;
-              ta.style.position = 'fixed';
-              ta.style.opacity = '0';
-              document.body.appendChild(ta);
-              ta.focus();
-              ta.select();
-              copied = document.execCommand('copy');
-              document.body.removeChild(ta);
-            } catch {}
-          }
-
-          b.textContent = '✓ Copied!';
-          b.style.borderColor = '#059669';
-          b.style.color = '#059669';
-          setTimeout(() => {
-            b.textContent = originalText;
-            b.style.borderColor = '';
-            b.style.color = '';
-          }, 1500);
-
-          if (navigator.share) {
-            try { await navigator.share({ title: 'QuickCart', text: s.text, url: link }); } catch {}
-          }
-
-          toast('Link copied! Share link: ' + link);
-        } catch (e) {
-          toast(e.message || 'Could not share');
-        }
-      });
+      document.querySelectorAll('#grid .card').forEach(attachCardListeners);
     } catch (e) { err('#shop-err', e.message); }
   }
   ['q', 'cat', 'col', 'min', 'max', 'sort'].forEach(i => $('#' + i).addEventListener('input', load)); load();
